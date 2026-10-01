@@ -1,0 +1,214 @@
+ДЕМОНСТРАЦИЯ: ДВА МИКРОСЕРВИСА SPRING BOOT + KAFKA + MYSQL + REACT
+====================================================================
+
+Этот проект показывает простой путь одной строки через несколько компонентов:
+
+  Producer (Spring Boot)
+      -> Kafka, топик random-strings
+      -> Consumer (Spring Boot)
+      -> таблица kafka_messages в MySQL
+      -> REST API Spring Boot
+      -> страница React в браузере
+
+Все сервисы, Kafka и MySQL запускаются одной командой Docker Compose.
+React собирается в статические файлы и включается в приложение второго
+Spring Boot-сервиса. Для показа страницы отдельный web-сервер не нужен.
+Проект учебный: пароли в docker-compose.yml демонстрационные, не используйте
+их в рабочей среде.
+
+
+ЧТО УСТАНОВИТЬ ПЕРЕД ЗАПУСКОМ
+-----------------------------
+
+1. Docker Engine или Docker Desktop.
+2. Docker Compose v2 (команда `docker-compose` или `docker compose`, в
+   зависимости от способа установки).
+3. Доступ к интернету при первой сборке: Docker скачает образы и Maven/npm —
+   зависимости.
+
+Java, Maven и Node.js на компьютере для запуска через Docker не требуются:
+они используются внутри сборочных Docker-образов. Для запуска отдельных
+приложений вне Docker Java 21, Maven и Node.js потребуются.
+
+
+БЫСТРЫЙ ЗАПУСК ВСЕГО ПРОЕКТА
+----------------------------
+
+Откройте терминал в корневой папке проекта:
+
+  cd /home/karim/kafka_ex/2_micros_kafka
+
+Соберите образы и запустите Kafka, MySQL и оба микросервиса:
+
+  docker-compose up --build
+
+Оставьте терминал открытым: в нём будут видны логи сервисов. После запуска
+откройте в браузере:
+
+  http://localhost:8080
+
+Producer отправляет первую случайную строку при запуске, затем — примерно
+каждые 15 секунд. Consumer сохраняет каждую полученную строку в MySQL
+с временем приёма. React-страница запрашивает REST API каждые 3 секунды
+и показывает общее число сохранённых строк и последние 100 записей.
+
+Чтобы запустить контейнеры в фоне:
+
+  docker-compose up --build -d
+
+Посмотреть состояние контейнеров:
+
+  docker-compose ps
+
+Посмотреть общие логи:
+
+  docker-compose logs -f
+
+Логи одного компонента:
+
+  docker-compose logs -f producer
+  docker-compose logs -f consumer-ui
+  docker-compose logs -f kafka
+  docker-compose logs -f mysql
+
+Остановить контейнеры, сохранив данные в именованных томах:
+
+  docker-compose down
+
+Остановить контейнеры и удалить тома Kafka и MySQL (данные будут удалены):
+
+  docker-compose down -v
+
+Осторожно: `-v` стирает сохранённые демонстрационные сообщения и данные Kafka.
+
+
+ЧТО ПОКАЗАНО В ПРОЕКТЕ
+----------------------
+
+1. Kafka — брокер сообщений. Producer и Consumer не вызывают друг друга
+   напрямую: Producer пишет строку в топик, а Consumer подписывается на этот
+   топик и читает сообщения. В Compose используется режим Kafka KRaft, поэтому
+   отдельный ZooKeeper не нужен.
+
+2. Producer — чистый Spring Boot-сервис, без веб-интерфейса и базы данных.
+   Класс ProducerApplication включает планировщик @EnableScheduling.
+   RandomStringPublisher создаёт случайную шестнадцатеричную строку и
+   отправляет её через KafkaTemplate. Интервал задаёт настройка
+   PRODUCER_INTERVAL_MS (в Compose это 15000 миллисекунд).
+
+3. Consumer/UI — второй Spring Boot-сервис. MessageListener слушает топик
+   random-strings и сохраняет тело строки и время получения в MySQL.
+   KafkaMessage — JPA-сущность для таблицы kafka_messages; база при первом
+   старте создаёт таблицу автоматически благодаря spring.jpa.hibernate.ddl-auto.
+   KafkaMessageRepository выполняет чтение и сохранение.
+
+4. REST API — GET http://localhost:8080/api/messages. Ответ содержит
+   totalCount — общее число строк в таблице — и messages, последние 100 строк
+   с id, content и receivedAt. id базы используется на странице как сквозной
+   номер «Строка 1», «Строка 2» и так далее.
+
+5. React — исходники в consumer-ui-service/frontend. App.jsx периодически
+   загружает ответ API, показывает состояние ожидания и ошибки, а также
+   список сообщений. Время отображается в формате браузера.
+   styles.css оформляет страницу и адаптирует её для узких экранов.
+
+6. Docker Compose — docker-compose.yml описывает все четыре контейнера
+   (Kafka, MySQL, producer, consumer-ui), порты, настройки и порядок старта.
+   Сервисы приложений ждут, пока Kafka и MySQL пройдут healthcheck.
+   kafka_data и mysql_data — именованные тома для сохранения данных между
+   перезапусками контейнеров.
+
+
+КАТАЛОГИ И ОСНОВНЫЕ ФАЙЛЫ
+-------------------------
+
+  docker-compose.yml
+      Единый запуск инфраструктуры и двух приложений.
+
+  producer-service/
+      Отдельный Spring Boot Kafka producer.
+      src/main/java/ru/demo/producer/ProducerApplication.java
+          Точка входа приложения, включает планирование.
+      src/main/java/ru/demo/producer/RandomStringPublisher.java
+          Создаёт и отправляет случайную строку каждые 15 секунд.
+      src/main/resources/application.properties
+          Адрес Kafka, имя топика и интервал отправки.
+      Dockerfile
+          Собирает и запускает producer в контейнере.
+
+  consumer-ui-service/
+      Spring Boot Kafka consumer, REST API и React-интерфейс.
+      src/main/java/ru/demo/consumer/MessageListener.java
+          Получает Kafka-сообщения и сохраняет их в базу.
+      src/main/java/ru/demo/consumer/KafkaMessage.java
+          Описывает сохраняемую строку и время её получения.
+      src/main/java/ru/demo/consumer/KafkaMessageRepository.java
+          Доступ к данным MySQL через Spring Data JPA.
+      src/main/java/ru/demo/consumer/MessageController.java
+          REST API для отображения последних сообщений.
+      src/main/resources/application.properties
+          Настройки Kafka, API и MySQL.
+      frontend/src/App.jsx
+          React-компонент страницы мониторинга.
+      frontend/src/styles.css
+          Стили и мобильная адаптация.
+      Dockerfile
+          Сначала собирает React, затем добавляет его в Spring Boot и собирает
+          единый запускаемый образ.
+
+
+ПРОВЕРКА РАБОТЫ
+---------------
+
+1. Выполните `docker-compose up --build`.
+2. Дождитесь, пока сервисы запустятся. Первая сборка может занять несколько
+   минут.
+3. Откройте http://localhost:8080.
+4. Убедитесь, что появляется «Строка 1» со случайным значением и временем.
+5. Примерно через 15 секунд должна появиться следующая строка.
+6. Проверьте JSON API по адресу http://localhost:8080/api/messages.
+7. В логах consumer-ui найдите сообщения «Сохранена строка из Kafka».
+
+Если сайт пока показывает состояние ожидания, проверьте `docker-compose ps`
+и логи командой `docker-compose logs -f producer consumer-ui`. При первой
+инициализации MySQL или Kafka потребуется немного подождать.
+
+
+ПОЛЕЗНЫЕ НАСТРОЙКИ И ПОРТЫ
+--------------------------
+
+  8080 — страница React и REST API второго микросервиса.
+  9092 — порт Kafka, доступный с компьютера.
+  MySQL доступен только контейнерам этой Compose-сети на внутреннем порту 3306.
+  Публиковать порт базы на компьютере не требуется для работы демо.
+
+Интервал генерации настраивается переменной PRODUCER_INTERVAL_MS в
+docker-compose.yml. Например, значение 5000 задаёт интервал 5 секунд.
+Топик по умолчанию называется random-strings. Имя топика должно совпадать у
+producer и consumer.
+
+REST-страница показывает до 100 последних строк, а счётчик показывает общее
+количество записей. Для учебного проекта таблица настраивается автоматически;
+миграции схемы и аутентификация в него не добавлены.
+
+
+ЗАПУСК SPRING BOOT ЛОКАЛЬНО (НЕОБЯЗАТЕЛЬНО)
+-------------------------------------------
+
+Обычно используйте Docker Compose. Для самостоятельной разработки приложений
+можно запустить Kafka и MySQL через Compose, а Java-приложения — локально.
+При этом localhost в настройках указывает на опубликованные порты Docker.
+
+Запуск producer из отдельного терминала:
+
+  cd /home/karim/kafka_ex/2_micros_kafka/producer-service
+  mvn spring-boot:run
+
+Запуск consumer из второго терминала:
+
+  cd /home/karim/kafka_ex/2_micros_kafka/consumer-ui-service
+  mvn spring-boot:run
+
+Для локального режима Kafka и MySQL должны быть заранее запущены, а React
+должен быть собран в src/main/resources/static. Полный рекомендованный путь,
+который автоматически собирает также React, — `docker-compose up --build`.

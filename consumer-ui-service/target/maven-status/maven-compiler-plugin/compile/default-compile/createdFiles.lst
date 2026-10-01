@@ -1,0 +1,7 @@
+ru/demo/consumer/ConsumerUiApplication.class
+ru/demo/consumer/MessageListener.class
+ru/demo/consumer/MessageController$MessagesResponse.class
+ru/demo/consumer/KafkaMessage.class
+ru/demo/consumer/MessageResponse.class
+ru/demo/consumer/KafkaMessageRepository.class
+ru/demo/consumer/MessageController.class

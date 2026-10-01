@@ -1,0 +1,6 @@
+/home/karim/kafka_ex/2_micros_kafka/consumer-ui-service/src/main/java/ru/demo/consumer/ConsumerUiApplication.java
+/home/karim/kafka_ex/2_micros_kafka/consumer-ui-service/src/main/java/ru/demo/consumer/KafkaMessage.java
+/home/karim/kafka_ex/2_micros_kafka/consumer-ui-service/src/main/java/ru/demo/consumer/KafkaMessageRepository.java
+/home/karim/kafka_ex/2_micros_kafka/consumer-ui-service/src/main/java/ru/demo/consumer/MessageController.java
+/home/karim/kafka_ex/2_micros_kafka/consumer-ui-service/src/main/java/ru/demo/consumer/MessageListener.java
+/home/karim/kafka_ex/2_micros_kafka/consumer-ui-service/src/main/java/ru/demo/consumer/MessageResponse.java
